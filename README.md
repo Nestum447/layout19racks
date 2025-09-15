@@ -1,5 +1,7 @@
 # layout19racks
 
+https://nestum447.github.io/layout19racks/
+
 # Simulación de Bodega Interactiva
 
 Este proyecto es una **simulación de bodega** con racks interactivos, ideal para visualizar y administrar la ocupación de una bodega o inventario de manera visual. Permite seleccionar sububicaciones, marcar niveles como “Ubicación Piso”, calcular totales por rack y generar un archivo Excel con los datos y colores reflejados.
