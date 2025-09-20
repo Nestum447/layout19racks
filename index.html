@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Racks Interactivos con Firestore</title>
+<title>Racks Interactivos con Firebase</title>
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 
 <!-- Firebase SDK compat -->
@@ -28,7 +28,7 @@ h2 { margin-top: 30px; }
 </head>
 <body>
 
-<h1>📦 Simulación de Bodega con 19 Racks + Firestore</h1>
+<h1>📦 Simulación de Bodega con 19 Racks + Firebase</h1>
 <div id="contenedor"></div>
 
 <div id="globalButtons">
@@ -62,7 +62,7 @@ const letras = "ABCDEFGHIJKLMNOPQRSTUVW".split("");
 const niveles = [1,2,3,4,5,6];
 const totalRacks = 19;
 const contenedor = document.getElementById("contenedor");
-let estadoGlobal = {}; // Guarda el estado de cada sub
+let estadoGlobal = {}; // Guardará todos los estados
 
 /* =======================
   Guardar estado en Firestore
@@ -86,6 +86,7 @@ async function crearRacks(){
     const rack = document.createElement("div"); rack.className="rack";
     rack.innerHTML=`<h2>Rack ${r}</h2>`;
 
+    // Botones Rack
     const btnSel = document.createElement("button"); btnSel.className="btn"; btnSel.innerText="Seleccionar Rack";
     btnSel.onclick = () => seleccionarRack(r,true);
     const btnDes = document.createElement("button"); btnDes.className="btn"; btnDes.innerText="Deseleccionar Rack";
@@ -107,12 +108,14 @@ async function crearRacks(){
       letras.forEach(letra=>{
         const ubicacion = document.createElement("div"); ubicacion.className="ubicacion";
         const numSub = (r<=4 && nivel===1) ? 6 : 3;
+
         for(let i=1;i<=numSub;i++){
           const sub = document.createElement("div"); sub.className="sub"; 
           sub.innerText=`${letra}${nivel}`;
           const idSub = `r${r}_n${nivel}_l${letra}_i${i}`;
           sub.dataset.rack=r; sub.dataset.nivel=nivel; sub.dataset.id=idSub; sub.dataset.estado="ninguno";
 
+          // Restaurar estado de Firestore
           if(estadoGlobal[idSub]==="verde") { sub.classList.add("seleccionada"); sub.dataset.estado="verde"; }
           if(estadoGlobal[idSub]==="piso") { sub.classList.add("piso"); sub.dataset.estado="piso"; }
 
@@ -204,14 +207,13 @@ function descargarExcel(){
       const row=[];
       letras.forEach(letra=>{
         const numSub = (r<=4 && nivel===1) ? 6 : 3;
-        const subs = Array.from(document.querySelectorAll(`.sub[data-rack="${r}"][data-nivel="${nivel}"]`))
-                          .filter(s=>s.innerText.startsWith(letra))
-                          .slice(0,numSub);
-        subs.forEach(s=>{
-          if(s.dataset.estado==="verde") row.push("V");
-          else if(s.dataset.estado==="piso") row.push("P");
+        for(let i=1;i<=numSub;i++){
+          const idSub = `r${r}_n${nivel}_l${letra}_i${i}`;
+          const val = estadoGlobal[idSub];
+          if(val==="verde") row.push("V");
+          else if(val==="piso") row.push("P");
           else row.push("");
-        });
+        }
       });
       ws_data.push(row);
     });
@@ -221,6 +223,7 @@ function descargarExcel(){
     ws_data.push([`Totales Rack ${r}: Verde=${verde} Naranja=${naranja} Combinadas=${verde+naranja}`]);
     ws_data.push([]);
   }
+
   const ws = XLSX.utils.aoa_to_sheet(ws_data);
   ws_data.forEach((fila,rIndex)=>{
     fila.forEach((val,cIndex)=>{
@@ -236,9 +239,10 @@ function descargarExcel(){
 }
 
 /* =======================
-  Ejecutar
+  Ejecutar creación de racks
 ======================= */
 crearRacks();
+
 </script>
 </body>
 </html>
