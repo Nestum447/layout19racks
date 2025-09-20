@@ -2,12 +2,13 @@
 <html lang="es">
 <head>
 <meta charset="UTF-8">
-<title>Racks Interactivos con Firebase</title>
+<title>Racks Interactivos con Firestore</title>
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<!-- Firebase SDK -->
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
-  import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-analytics.js";
-  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
-  import * as XLSX from "https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js";
+  // 🔹 Import Firebase
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.2.0/firebase-firestore.js";
 
   // 🔹 Configuración de Firebase
   const firebaseConfig = {
@@ -21,195 +22,10 @@
   };
 
   const app = initializeApp(firebaseConfig);
-  const analytics = getAnalytics(app);
   const db = getFirestore(app);
 
-  const letras = "ABCDEFGHIJKLMNOPQRSTUVW".split("");
-  const niveles = [1,2,3,4,5,6];
-  const totalRacks = 19;
-  const contenedor = document.getElementById("contenedor");
-
-  // 🔹 Funciones de Firestore
-  async function guardarEstado() {
-    const estados = {};
-    document.querySelectorAll(".sub").forEach(s => {
-      const id = `rack${s.dataset.rack}-nivel${s.dataset.nivel}-${s.innerText}`;
-      estados[id] = s.dataset.estado;
-    });
-    await setDoc(doc(db, "bodega", "estadoActual"), estados);
-  }
-
-  async function cargarEstado() {
-    const docSnap = await getDoc(doc(db, "bodega", "estadoActual"));
-    if (!docSnap.exists()) return;
-    const estados = docSnap.data();
-    document.querySelectorAll(".sub").forEach(s => {
-      const id = `rack${s.dataset.rack}-nivel${s.dataset.nivel}-${s.innerText}`;
-      const estado = estados[id] || "ninguno";
-      s.dataset.estado = estado;
-      s.classList.remove("seleccionada","piso");
-      if (estado === "verde") s.classList.add("seleccionada");
-      if (estado === "piso") s.classList.add("piso");
-    });
-    actualizarGranTotal();
-  }
-
-  // 🔹 Función principal asincrónica
-  (async function main() {
-    // Crear racks
-    for(let r=1; r<=totalRacks; r++){
-      const rack = document.createElement("div"); rack.className="rack";
-      rack.innerHTML=`<h2>Rack ${r}</h2>`;
-
-      // Botones rack
-      const btnSel = document.createElement("button"); btnSel.className="btn"; btnSel.innerText="Seleccionar Rack";
-      btnSel.onclick = () => seleccionarRack(r,true);
-      const btnDes = document.createElement("button"); btnDes.className="btn"; btnDes.innerText="Deseleccionar Rack";
-      btnDes.onclick = () => seleccionarRack(r,false);
-      rack.appendChild(btnSel); rack.appendChild(btnDes);
-
-      // Filas y sububicaciones
-      niveles.forEach(nivel=>{
-        const fila = document.createElement("div"); fila.className="fila";
-
-        const filaBtnSel = document.createElement("button"); filaBtnSel.className="btn"; filaBtnSel.innerText=`Fila ${nivel} ✔`;
-        filaBtnSel.onclick = () => seleccionarFila(r,nivel,true);
-        const filaBtnDes = document.createElement("button"); filaBtnDes.className="btn"; filaBtnDes.innerText=`Fila ${nivel} ✘`;
-        filaBtnDes.onclick = () => seleccionarFila(r,nivel,false);
-        const filaBtnPiso = document.createElement("button"); filaBtnPiso.className="btn"; filaBtnPiso.innerText=`Ubicación Piso ${nivel}`;
-        filaBtnPiso.onclick = () => togglePiso(r,nivel);
-
-        fila.appendChild(filaBtnSel); fila.appendChild(filaBtnDes); fila.appendChild(filaBtnPiso);
-
-        letras.forEach(letra=>{
-          const ubicacion = document.createElement("div"); ubicacion.className="ubicacion";
-          const numSub = (r<=4 && nivel===1) ? 6 : 3;
-          for(let i=1;i<=numSub;i++){
-            const sub = document.createElement("div"); sub.className="sub"; sub.innerText=`${letra}${nivel}`;
-            sub.dataset.rack=r; sub.dataset.nivel=nivel; sub.dataset.estado="ninguno";
-            sub.addEventListener("click",()=>{
-              if(sub.classList.contains("seleccionada")){
-                sub.classList.remove("seleccionada"); sub.dataset.estado="ninguno";
-              }else{
-                sub.classList.add("seleccionada"); sub.classList.remove("piso"); sub.dataset.estado="verde";
-              }
-              actualizarTotales(r); actualizarGranTotal();
-            });
-            ubicacion.appendChild(sub);
-          }
-          fila.appendChild(ubicacion);
-        });
-        rack.appendChild(fila);
-      });
-
-      const totales = document.createElement("div"); totales.className="totales"; totales.id=`totales-${r}`;
-      rack.appendChild(totales);
-      contenedor.appendChild(rack);
-      actualizarTotales(r);
-    }
-
-    // 🔹 Una vez creados los racks, cargar el estado desde Firestore
-    await cargarEstado();
-  })();
-
-  // 🔹 Funciones de selección y totales
-  function seleccionarRack(rackNum,seleccionar){
-    const subs=document.querySelectorAll(`.sub[data-rack="${rackNum}"]`);
-    subs.forEach(s=>{
-      if(seleccionar){ s.classList.add("seleccionada"); s.classList.remove("piso"); s.dataset.estado="verde"; }
-      else{ s.classList.remove("seleccionada","piso"); s.dataset.estado="ninguno"; }
-    });
-    actualizarTotales(rackNum); actualizarGranTotal();
-  }
-
-  function seleccionarFila(rackNum,nivel,seleccionar){
-    const subs=document.querySelectorAll(`.sub[data-rack="${rackNum}"][data-nivel="${nivel}"]`);
-    subs.forEach(s=>{
-      if(seleccionar){ s.classList.add("seleccionada"); s.classList.remove("piso"); s.dataset.estado="verde"; }
-      else{ s.classList.remove("seleccionada","piso"); s.dataset.estado="ninguno"; }
-    });
-    actualizarTotales(rackNum); actualizarGranTotal();
-  }
-
-  function togglePiso(rackNum,nivel){
-    const subs=document.querySelectorAll(`.sub[data-rack="${rackNum}"][data-nivel="${nivel}"]`);
-    subs.forEach(s=>{
-      if(s.classList.contains("piso")){ s.classList.remove("piso"); s.dataset.estado="ninguno"; }
-      else{ s.classList.add("piso"); s.classList.remove("seleccionada"); s.dataset.estado="piso"; }
-    });
-    actualizarTotales(rackNum); actualizarGranTotal();
-  }
-
-  function seleccionarTodos(seleccionar){
-    for(let r=1;r<=totalRacks;r++) seleccionarRack(r,seleccionar);
-    actualizarGranTotal();
-  }
-
-  function actualizarTotales(rackNum){
-    const subs=document.querySelectorAll(`.sub[data-rack="${rackNum}"]`);
-    let verde=0, naranja=0;
-    subs.forEach(s=>{ if(s.dataset.estado==="verde") verde++; if(s.dataset.estado==="piso") naranja++; });
-    const combinadas=verde+naranja;
-    const noSel=subs.length-combinadas;
-    document.getElementById(`totales-${rackNum}`).innerText=
-      `Rack ${rackNum} → Verde: ${verde} | Naranja: ${naranja} | Combinadas: ${combinadas} | No seleccionadas: ${noSel}`;
-    guardarEstado(); // Guarda automáticamente en Firestore
-  }
-
-  function actualizarGranTotal(){
-    const subs=document.querySelectorAll(".sub");
-    let verde=0, naranja=0;
-    subs.forEach(s=>{ if(s.dataset.estado==="verde") verde++; if(s.dataset.estado==="piso") naranja++; });
-    const combinadas=verde+naranja;
-    const noSel=subs.length-combinadas;
-    document.getElementById("granTotal").innerText=
-      `TOTAL → Verde: ${verde} | Naranja: ${naranja} | Combinadas: ${combinadas} | No seleccionadas: ${noSel}`;
-  }
-
-  // 🔹 Descargar Excel
-  function descargarExcel(){
-    const wb = XLSX.utils.book_new();
-    const ws_data = [];
-    for(let r=1; r<=totalRacks; r++){
-      ws_data.push([`Rack ${r}`]);
-      ws_data.push(letras.map(l=>`${l}1`).flat());
-      niveles.forEach(nivel=>{
-        const row=[];
-        letras.forEach(letra=>{
-          const numSub = (r<=4 && nivel===1) ? 6 : 3;
-          const subs = Array.from(document.querySelectorAll(`.sub[data-rack="${r}"][data-nivel="${nivel}"]`))
-                            .filter(s=>s.innerText.startsWith(letra))
-                            .slice(0,numSub);
-          subs.forEach(s=>{
-            if(s.dataset.estado==="verde") row.push("V");
-            else if(s.dataset.estado==="piso") row.push("P");
-            else row.push("");
-          });
-        });
-        ws_data.push(row);
-      });
-      const subsRack=document.querySelectorAll(`.sub[data-rack="${r}"]`);
-      let verde=0, naranja=0;
-      subsRack.forEach(s=>{ if(s.dataset.estado==="verde") verde++; if(s.dataset.estado==="piso") naranja++; });
-      ws_data.push([`Totales Rack ${r}: Verde=${verde} Naranja=${naranja} Combinadas=${verde+naranja}`]);
-      ws_data.push([]);
-    }
-
-    const ws = XLSX.utils.aoa_to_sheet(ws_data);
-    ws_data.forEach((fila,rIndex)=>{
-      fila.forEach((val,cIndex)=>{
-        const cell_ref = XLSX.utils.encode_cell({c:cIndex,r:rIndex});
-        const cell = ws[cell_ref];
-        if(!cell) return;
-        if(val==="V") cell.s={fill:{fgColor:{rgb:"00FF00"}}};
-        if(val==="P") cell.s={fill:{fgColor:{rgb:"FFA500"}}};
-      });
-    });
-    XLSX.utils.book_append_sheet(wb, ws, "Bodega Completa");
-    XLSX.writeFile(wb,"Bodega_Racks.xlsx");
-  }
+  window.db = db; // Para usar db en funciones globales
 </script>
-
 <style>
 body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
 h2 { margin-top: 30px; }
@@ -226,7 +42,6 @@ h2 { margin-top: 30px; }
 #granTotal { background: #222; color: #fff; padding: 15px; border-radius: 10px; font-size: 18px; text-align: center; position: sticky; bottom: 0; }
 #globalButtons { margin: 20px 0; text-align: center; }
 </style>
-
 </head>
 <body>
 <h1>📦 Simulación de Bodega con 19 Racks + Firestore</h1>
@@ -239,5 +54,223 @@ h2 { margin-top: 30px; }
 </div>
 
 <div id="granTotal">TOTAL → Verde: 0 | Naranja: 0 | Combinadas: 0 | No seleccionadas: 0</div>
+
+<script type="module">
+import { db } from "./"; // Usando la variable global
+const { doc, setDoc, getDoc } = await import("https://www.gstatic.com/firebasejs/10.2.0/firebase-firestore.js");
+
+const letras = "ABCDEFGHIJKLMNOPQRSTUVW".split("");
+const niveles = [1,2,3,4,5,6];
+const totalRacks = 19;
+const contenedor = document.getElementById("contenedor");
+
+let estadoGlobal = {}; // Guardará todos los estados de sub
+
+// 🔹 Función para guardar en Firestore
+async function guardarEstado(){
+  try{
+    await setDoc(doc(db, "racks", "estado"), estadoGlobal);
+    console.log("Estado guardado");
+  }catch(e){ console.error(e); }
+}
+
+// 🔹 Función para cargar desde Firestore
+async function cargarEstado(){
+  try{
+    const docRef = doc(db,"racks","estado");
+    const docSnap = await getDoc(docRef);
+    if(docSnap.exists()){
+      estadoGlobal = docSnap.data();
+      for(const key in estadoGlobal){
+        const sub = document.querySelector(`.sub[data-id="${key}"]`);
+        if(sub){
+          sub.classList.remove("seleccionada","piso");
+          if(estadoGlobal[key]==="verde") sub.classList.add("seleccionada");
+          if(estadoGlobal[key]==="piso") sub.classList.add("piso");
+          sub.dataset.estado = estadoGlobal[key];
+        }
+      }
+    }
+    actualizarGranTotal();
+  }catch(e){ console.error(e); }
+}
+
+// 🔹 Crear racks
+for(let r=1; r<=totalRacks; r++){
+  const rack = document.createElement("div"); rack.className="rack";
+  rack.innerHTML=`<h2>Rack ${r}</h2>`;
+
+  // Botones rack
+  const btnSel = document.createElement("button"); btnSel.className="btn"; btnSel.innerText="Seleccionar Rack";
+  btnSel.onclick = async () => { await seleccionarRack(r,true); };
+  const btnDes = document.createElement("button"); btnDes.className="btn"; btnDes.innerText="Deseleccionar Rack";
+  btnDes.onclick = async () => { await seleccionarRack(r,false); };
+  rack.appendChild(btnSel); rack.appendChild(btnDes);
+
+  // Crear filas y sububicaciones
+  niveles.forEach(nivel=>{
+    const fila = document.createElement("div"); fila.className="fila";
+
+    const filaBtnSel = document.createElement("button"); filaBtnSel.className="btn"; filaBtnSel.innerText=`Fila ${nivel} ✔`;
+    filaBtnSel.onclick = async () => { await seleccionarFila(r,nivel,true); };
+    const filaBtnDes = document.createElement("button"); filaBtnDes.className="btn"; filaBtnDes.innerText=`Fila ${nivel} ✘`;
+    filaBtnDes.onclick = async () => { await seleccionarFila(r,nivel,false); };
+    const filaBtnPiso = document.createElement("button"); filaBtnPiso.className="btn"; filaBtnPiso.innerText=`Ubicación Piso ${nivel}`;
+    filaBtnPiso.onclick = async () => { await togglePiso(r,nivel); };
+
+    fila.appendChild(filaBtnSel); fila.appendChild(filaBtnDes); fila.appendChild(filaBtnPiso);
+
+    letras.forEach(letra=>{
+      const ubicacion = document.createElement("div"); ubicacion.className="ubicacion";
+      const numSub = (r<=4 && nivel===1) ? 6 : 3;
+      for(let i=1;i<=numSub;i++){
+        const sub = document.createElement("div"); sub.className="sub"; 
+        sub.innerText=`${letra}${nivel}`;
+        const idSub = `r${r}_n${nivel}_l${letra}_i${i}`;
+        sub.dataset.rack=r; sub.dataset.nivel=nivel; sub.dataset.id=idSub; sub.dataset.estado="ninguno";
+
+        // Evento click
+        sub.addEventListener("click", async ()=>{
+          if(sub.classList.contains("seleccionada")){
+            sub.classList.remove("seleccionada"); sub.dataset.estado="ninguno";
+            estadoGlobal[idSub]="ninguno";
+          }else{
+            sub.classList.add("seleccionada"); sub.classList.remove("piso"); sub.dataset.estado="verde";
+            estadoGlobal[idSub]="verde";
+          }
+          actualizarTotales(r);
+          actualizarGranTotal();
+          await guardarEstado();
+        });
+
+        ubicacion.appendChild(sub);
+      }
+      fila.appendChild(ubicacion);
+    });
+
+    rack.appendChild(fila);
+  });
+
+  const totales = document.createElement("div"); totales.className="totales"; totales.id=`totales-${r}`;
+  rack.appendChild(totales);
+  contenedor.appendChild(rack);
+  actualizarTotales(r);
+}
+
+// 🔹 Funciones de selección
+async function seleccionarRack(rackNum, seleccionar){
+  const subs=document.querySelectorAll(`.sub[data-rack="${rackNum}"]`);
+  subs.forEach(s=>{
+    if(seleccionar){ s.classList.add("seleccionada"); s.classList.remove("piso"); s.dataset.estado="verde"; estadoGlobal[s.dataset.id]="verde"; }
+    else{ s.classList.remove("seleccionada","piso"); s.dataset.estado="ninguno"; estadoGlobal[s.dataset.id]="ninguno"; }
+  });
+  actualizarTotales(rackNum);
+  actualizarGranTotal();
+  await guardarEstado();
+}
+
+async function seleccionarFila(rackNum, nivel, seleccionar){
+  const subs=document.querySelectorAll(`.sub[data-rack="${rackNum}"][data-nivel="${nivel}"]`);
+  subs.forEach(s=>{
+    if(seleccionar){ s.classList.add("seleccionada"); s.classList.remove("piso"); s.dataset.estado="verde"; estadoGlobal[s.dataset.id]="verde"; }
+    else{ s.classList.remove("seleccionada","piso"); s.dataset.estado="ninguno"; estadoGlobal[s.dataset.id]="ninguno"; }
+  });
+  actualizarTotales(rackNum);
+  actualizarGranTotal();
+  await guardarEstado();
+}
+
+async function togglePiso(rackNum, nivel){
+  const subs=document.querySelectorAll(`.sub[data-rack="${rackNum}"][data-nivel="${nivel}"]`);
+  subs.forEach(s=>{
+    if(s.classList.contains("piso")){ s.classList.remove("piso"); s.dataset.estado="ninguno"; estadoGlobal[s.dataset.id]="ninguno"; }
+    else{ s.classList.add("piso"); s.classList.remove("seleccionada"); s.dataset.estado="piso"; estadoGlobal[s.dataset.id]="piso"; }
+  });
+  actualizarTotales(rackNum);
+  actualizarGranTotal();
+  await guardarEstado();
+}
+
+async function seleccionarTodos(seleccionar){
+  for(let r=1;r<=totalRacks;r++){
+    await seleccionarRack(r, seleccionar);
+  }
+  actualizarGranTotal();
+}
+
+// 🔹 Totales
+function actualizarTotales(rackNum){
+  const subs=document.querySelectorAll(`.sub[data-rack="${rackNum}"]`);
+  let verde=0, naranja=0;
+  subs.forEach(s=>{ if(s.dataset.estado==="verde") verde++; if(s.dataset.estado==="piso") naranja++; });
+  const combinadas=verde+naranja;
+  const noSel=subs.length-combinadas;
+  document.getElementById(`totales-${rackNum}`).innerText=
+    `Rack ${rackNum} → Verde: ${verde} | Naranja: ${naranja} | Combinadas: ${combinadas} | No seleccionadas: ${noSel}`;
+}
+
+function actualizarGranTotal(){
+  const subs=document.querySelectorAll(".sub");
+  let verde=0, naranja=0;
+  subs.forEach(s=>{ if(s.dataset.estado==="verde") verde++; if(s.dataset.estado==="piso") naranja++; });
+  const combinadas=verde+naranja;
+  const noSel=subs.length-combinadas;
+  document.getElementById("granTotal").innerText=
+    `TOTAL → Verde: ${verde} | Naranja: ${naranja} | Combinadas: ${combinadas} | No seleccionadas: ${noSel}`;
+}
+
+// 🔹 Descargar Excel
+function descargarExcel(){
+  const wb = XLSX.utils.book_new();
+  const ws_data = [];
+  
+  for(let r=1; r<=totalRacks; r++){
+    ws_data.push([`Rack ${r}`]);
+    ws_data.push(letras.map(l=>`${l}1`).flat());
+
+    niveles.forEach(nivel=>{
+      const row=[];
+      letras.forEach(letra=>{
+        const numSub = (r<=4 && nivel===1) ? 6 : 3;
+        const subs = Array.from(document.querySelectorAll(`.sub[data-rack="${r}"][data-nivel="${nivel}"]`))
+                          .filter(s=>s.innerText.startsWith(letra))
+                          .slice(0,numSub);
+        subs.forEach(s=>{
+          if(s.dataset.estado==="verde") row.push("V");
+          else if(s.dataset.estado==="piso") row.push("P");
+          else row.push("");
+        });
+      });
+      ws_data.push(row);
+    });
+
+    // Totales rack
+    const subsRack=document.querySelectorAll(`.sub[data-rack="${r}"]`);
+    let verde=0, naranja=0;
+    subsRack.forEach(s=>{ if(s.dataset.estado==="verde") verde++; if(s.dataset.estado==="piso") naranja++; });
+    ws_data.push([`Totales Rack ${r}: Verde=${verde} Naranja=${naranja} Combinadas=${verde+naranja}`]);
+    ws_data.push([]);
+  }
+
+  const ws = XLSX.utils.aoa_to_sheet(ws_data);
+
+  // Colorear celdas
+  ws_data.forEach((fila,rIndex)=>{
+    fila.forEach((val,cIndex)=>{
+      const cell_ref = XLSX.utils.encode_cell({c:cIndex,r:rIndex});
+      const cell = ws[cell_ref];
+      if(!cell) return;
+      if(val==="V") cell.s={fill:{fgColor:{rgb:"00FF00"}}};
+      if(val==="P") cell.s={fill:{fgColor:{rgb:"FFA500"}}};
+    });
+  });
+
+  XLSX.utils.book_append_sheet(wb, ws, "Bodega Completa");
+  XLSX.writeFile(wb,"Bodega_Racks.xlsx");
+}
+
+// 🔹 Al cargar la página
+window.addEventListener("load", cargarEstado);
+</script>
 </body>
 </html>
