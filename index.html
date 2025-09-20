@@ -4,13 +4,12 @@
 <meta charset="UTF-8">
 <title>Racks Interactivos con Firebase</title>
 <script type="module">
-  // 🔹 Firebase SDK
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
   import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-analytics.js";
   import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
   import * as XLSX from "https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js";
 
-  // 🔹 Firebase configuration (tu proyecto)
+  // 🔹 Configuración de Firebase
   const firebaseConfig = {
     apiKey: "AIzaSyDnqaBbnieclhdOdbbtaSaVuu7erU5_5_Y",
     authDomain: "layout-944b5.firebaseapp.com",
@@ -21,18 +20,16 @@
     measurementId: "G-LY17755TBD"
   };
 
-  // 🔹 Initialize Firebase
   const app = initializeApp(firebaseConfig);
   const analytics = getAnalytics(app);
   const db = getFirestore(app);
 
-  // 🔹 Variables principales
   const letras = "ABCDEFGHIJKLMNOPQRSTUVW".split("");
   const niveles = [1,2,3,4,5,6];
   const totalRacks = 19;
   const contenedor = document.getElementById("contenedor");
 
-  // 🔹 Funciones para guardar y cargar estado en Firestore
+  // 🔹 Funciones de Firestore
   async function guardarEstado() {
     const estados = {};
     document.querySelectorAll(".sub").forEach(s => {
@@ -44,73 +41,78 @@
 
   async function cargarEstado() {
     const docSnap = await getDoc(doc(db, "bodega", "estadoActual"));
-    if (docSnap.exists()) {
-      const estados = docSnap.data();
-      document.querySelectorAll(".sub").forEach(s => {
-        const id = `rack${s.dataset.rack}-nivel${s.dataset.nivel}-${s.innerText}`;
-        const estado = estados[id] || "ninguno";
-        s.dataset.estado = estado;
-        s.classList.remove("seleccionada", "piso");
-        if (estado === "verde") s.classList.add("seleccionada");
-        if (estado === "piso") s.classList.add("piso");
-      });
-      actualizarGranTotal();
-    }
-  }
-
-  // 🔹 Crear racks
-  for(let r=1; r<=totalRacks; r++){
-    const rack = document.createElement("div"); rack.className="rack";
-    rack.innerHTML=`<h2>Rack ${r}</h2>`;
-
-    // Botones rack
-    const btnSel = document.createElement("button"); btnSel.className="btn"; btnSel.innerText="Seleccionar Rack";
-    btnSel.onclick = () => seleccionarRack(r,true);
-    const btnDes = document.createElement("button"); btnDes.className="btn"; btnDes.innerText="Deseleccionar Rack";
-    btnDes.onclick = () => seleccionarRack(r,false);
-    rack.appendChild(btnSel); rack.appendChild(btnDes);
-
-    // Crear filas y sububicaciones
-    niveles.forEach(nivel=>{
-      const fila = document.createElement("div"); fila.className="fila";
-
-      const filaBtnSel = document.createElement("button"); filaBtnSel.className="btn"; filaBtnSel.innerText=`Fila ${nivel} ✔`;
-      filaBtnSel.onclick = () => seleccionarFila(r,nivel,true);
-      const filaBtnDes = document.createElement("button"); filaBtnDes.className="btn"; filaBtnDes.innerText=`Fila ${nivel} ✘`;
-      filaBtnDes.onclick = () => seleccionarFila(r,nivel,false);
-      const filaBtnPiso = document.createElement("button"); filaBtnPiso.className="btn"; filaBtnPiso.innerText=`Ubicación Piso ${nivel}`;
-      filaBtnPiso.onclick = () => togglePiso(r,nivel);
-
-      fila.appendChild(filaBtnSel); fila.appendChild(filaBtnDes); fila.appendChild(filaBtnPiso);
-
-      letras.forEach(letra=>{
-        const ubicacion = document.createElement("div"); ubicacion.className="ubicacion";
-        const numSub = (r<=4 && nivel===1) ? 6 : 3;
-        for(let i=1;i<=numSub;i++){
-          const sub = document.createElement("div"); sub.className="sub"; sub.innerText=`${letra}${nivel}`;
-          sub.dataset.rack=r; sub.dataset.nivel=nivel; sub.dataset.estado="ninguno";
-          sub.addEventListener("click",()=>{
-            if(sub.classList.contains("seleccionada")){
-              sub.classList.remove("seleccionada"); sub.dataset.estado="ninguno";
-            }else{
-              sub.classList.add("seleccionada"); sub.classList.remove("piso"); sub.dataset.estado="verde";
-            }
-            actualizarTotales(r); actualizarGranTotal();
-          });
-          ubicacion.appendChild(sub);
-        }
-        fila.appendChild(ubicacion);
-      });
-      rack.appendChild(fila);
+    if (!docSnap.exists()) return;
+    const estados = docSnap.data();
+    document.querySelectorAll(".sub").forEach(s => {
+      const id = `rack${s.dataset.rack}-nivel${s.dataset.nivel}-${s.innerText}`;
+      const estado = estados[id] || "ninguno";
+      s.dataset.estado = estado;
+      s.classList.remove("seleccionada","piso");
+      if (estado === "verde") s.classList.add("seleccionada");
+      if (estado === "piso") s.classList.add("piso");
     });
-
-    const totales = document.createElement("div"); totales.className="totales"; totales.id=`totales-${r}`;
-    rack.appendChild(totales);
-    contenedor.appendChild(rack);
-    actualizarTotales(r);
+    actualizarGranTotal();
   }
 
-  // 🔹 Funciones de selección
+  // 🔹 Función principal asincrónica
+  (async function main() {
+    // Crear racks
+    for(let r=1; r<=totalRacks; r++){
+      const rack = document.createElement("div"); rack.className="rack";
+      rack.innerHTML=`<h2>Rack ${r}</h2>`;
+
+      // Botones rack
+      const btnSel = document.createElement("button"); btnSel.className="btn"; btnSel.innerText="Seleccionar Rack";
+      btnSel.onclick = () => seleccionarRack(r,true);
+      const btnDes = document.createElement("button"); btnDes.className="btn"; btnDes.innerText="Deseleccionar Rack";
+      btnDes.onclick = () => seleccionarRack(r,false);
+      rack.appendChild(btnSel); rack.appendChild(btnDes);
+
+      // Filas y sububicaciones
+      niveles.forEach(nivel=>{
+        const fila = document.createElement("div"); fila.className="fila";
+
+        const filaBtnSel = document.createElement("button"); filaBtnSel.className="btn"; filaBtnSel.innerText=`Fila ${nivel} ✔`;
+        filaBtnSel.onclick = () => seleccionarFila(r,nivel,true);
+        const filaBtnDes = document.createElement("button"); filaBtnDes.className="btn"; filaBtnDes.innerText=`Fila ${nivel} ✘`;
+        filaBtnDes.onclick = () => seleccionarFila(r,nivel,false);
+        const filaBtnPiso = document.createElement("button"); filaBtnPiso.className="btn"; filaBtnPiso.innerText=`Ubicación Piso ${nivel}`;
+        filaBtnPiso.onclick = () => togglePiso(r,nivel);
+
+        fila.appendChild(filaBtnSel); fila.appendChild(filaBtnDes); fila.appendChild(filaBtnPiso);
+
+        letras.forEach(letra=>{
+          const ubicacion = document.createElement("div"); ubicacion.className="ubicacion";
+          const numSub = (r<=4 && nivel===1) ? 6 : 3;
+          for(let i=1;i<=numSub;i++){
+            const sub = document.createElement("div"); sub.className="sub"; sub.innerText=`${letra}${nivel}`;
+            sub.dataset.rack=r; sub.dataset.nivel=nivel; sub.dataset.estado="ninguno";
+            sub.addEventListener("click",()=>{
+              if(sub.classList.contains("seleccionada")){
+                sub.classList.remove("seleccionada"); sub.dataset.estado="ninguno";
+              }else{
+                sub.classList.add("seleccionada"); sub.classList.remove("piso"); sub.dataset.estado="verde";
+              }
+              actualizarTotales(r); actualizarGranTotal();
+            });
+            ubicacion.appendChild(sub);
+          }
+          fila.appendChild(ubicacion);
+        });
+        rack.appendChild(fila);
+      });
+
+      const totales = document.createElement("div"); totales.className="totales"; totales.id=`totales-${r}`;
+      rack.appendChild(totales);
+      contenedor.appendChild(rack);
+      actualizarTotales(r);
+    }
+
+    // 🔹 Una vez creados los racks, cargar el estado desde Firestore
+    await cargarEstado();
+  })();
+
+  // 🔹 Funciones de selección y totales
   function seleccionarRack(rackNum,seleccionar){
     const subs=document.querySelectorAll(`.sub[data-rack="${rackNum}"]`);
     subs.forEach(s=>{
@@ -143,7 +145,6 @@
     actualizarGranTotal();
   }
 
-  // 🔹 Actualización de totales
   function actualizarTotales(rackNum){
     const subs=document.querySelectorAll(`.sub[data-rack="${rackNum}"]`);
     let verde=0, naranja=0;
@@ -152,7 +153,7 @@
     const noSel=subs.length-combinadas;
     document.getElementById(`totales-${rackNum}`).innerText=
       `Rack ${rackNum} → Verde: ${verde} | Naranja: ${naranja} | Combinadas: ${combinadas} | No seleccionadas: ${noSel}`;
-    guardarEstado(); // 🔹 Guarda cada cambio automáticamente
+    guardarEstado(); // Guarda automáticamente en Firestore
   }
 
   function actualizarGranTotal(){
@@ -207,9 +208,6 @@
     XLSX.utils.book_append_sheet(wb, ws, "Bodega Completa");
     XLSX.writeFile(wb,"Bodega_Racks.xlsx");
   }
-
-  // 🔹 Cargar estado al iniciar la app
-  window.addEventListener("load", cargarEstado);
 </script>
 
 <style>
@@ -229,6 +227,7 @@ h2 { margin-top: 30px; }
 #globalButtons { margin: 20px 0; text-align: center; }
 </style>
 
+</head>
 <body>
 <h1>📦 Simulación de Bodega con 19 Racks + Firestore</h1>
 <div id="contenedor"></div>
