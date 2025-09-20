@@ -65,7 +65,7 @@ const contenedor = document.getElementById("contenedor");
 let estadoGlobal = {}; // Guarda el estado de cada sub
 
 /* =======================
-  Funciones Firestore
+  Función para guardar estado en Firestore
 ======================= */
 async function guardarEstado(){
   try{
@@ -74,89 +74,85 @@ async function guardarEstado(){
   }catch(e){ console.error(e); }
 }
 
-async function cargarEstado(){
+/* =======================
+  Función para crear los racks según estado
+======================= */
+async function crearRacks(){
+  // Primero cargamos el estado
   try{
     const docRef = db.collection("racks").doc("estado");
     const docSnap = await docRef.get();
     if(docSnap.exists){
       estadoGlobal = docSnap.data();
-      for(const key in estadoGlobal){
-        const sub = document.querySelector(`.sub[data-id="${key}"]`);
-        if(sub){
-          sub.classList.remove("seleccionada","piso");
-          if(estadoGlobal[key]==="verde") sub.classList.add("seleccionada");
-          if(estadoGlobal[key]==="piso") sub.classList.add("piso");
-          sub.dataset.estado = estadoGlobal[key];
-        }
-      }
     }
-    actualizarGranTotal();
   }catch(e){ console.error(e); }
-}
 
-/* =======================
-  Crear Racks
-======================= */
-for(let r=1; r<=totalRacks; r++){
-  const rack = document.createElement("div"); rack.className="rack";
-  rack.innerHTML=`<h2>Rack ${r}</h2>`;
+  // Crear racks
+  for(let r=1; r<=totalRacks; r++){
+    const rack = document.createElement("div"); rack.className="rack";
+    rack.innerHTML=`<h2>Rack ${r}</h2>`;
 
-  const btnSel = document.createElement("button"); btnSel.className="btn"; btnSel.innerText="Seleccionar Rack";
-  btnSel.onclick = () => seleccionarRack(r,true);
-  const btnDes = document.createElement("button"); btnDes.className="btn"; btnDes.innerText="Deseleccionar Rack";
-  btnDes.onclick = () => seleccionarRack(r,false);
-  rack.appendChild(btnSel); rack.appendChild(btnDes);
+    const btnSel = document.createElement("button"); btnSel.className="btn"; btnSel.innerText="Seleccionar Rack";
+    btnSel.onclick = () => seleccionarRack(r,true);
+    const btnDes = document.createElement("button"); btnDes.className="btn"; btnDes.innerText="Deseleccionar Rack";
+    btnDes.onclick = () => seleccionarRack(r,false);
+    rack.appendChild(btnSel); rack.appendChild(btnDes);
 
-  niveles.forEach(nivel=>{
-    const fila = document.createElement("div"); fila.className="fila";
+    niveles.forEach(nivel=>{
+      const fila = document.createElement("div"); fila.className="fila";
 
-    const filaBtnSel = document.createElement("button"); filaBtnSel.className="btn"; filaBtnSel.innerText=`Fila ${nivel} ✔`;
-    filaBtnSel.onclick = () => seleccionarFila(r,nivel,true);
-    const filaBtnDes = document.createElement("button"); filaBtnDes.className="btn"; filaBtnDes.innerText=`Fila ${nivel} ✘`;
-    filaBtnDes.onclick = () => seleccionarFila(r,nivel,false);
-    const filaBtnPiso = document.createElement("button"); filaBtnPiso.className="btn"; filaBtnPiso.innerText=`Ubicación Piso ${nivel}`;
-    filaBtnPiso.onclick = () => togglePiso(r,nivel);
+      const filaBtnSel = document.createElement("button"); filaBtnSel.className="btn"; filaBtnSel.innerText=`Fila ${nivel} ✔`;
+      filaBtnSel.onclick = () => seleccionarFila(r,nivel,true);
+      const filaBtnDes = document.createElement("button"); filaBtnDes.className="btn"; filaBtnDes.innerText=`Fila ${nivel} ✘`;
+      filaBtnDes.onclick = () => seleccionarFila(r,nivel,false);
+      const filaBtnPiso = document.createElement("button"); filaBtnPiso.className="btn"; filaBtnPiso.innerText=`Ubicación Piso ${nivel}`;
+      filaBtnPiso.onclick = () => togglePiso(r,nivel);
 
-    fila.appendChild(filaBtnSel); fila.appendChild(filaBtnDes); fila.appendChild(filaBtnPiso);
+      fila.appendChild(filaBtnSel); fila.appendChild(filaBtnDes); fila.appendChild(filaBtnPiso);
 
-    letras.forEach(letra=>{
-      const ubicacion = document.createElement("div"); ubicacion.className="ubicacion";
-      const numSub = (r<=4 && nivel===1) ? 6 : 3;
-      for(let i=1;i<=numSub;i++){
-        const sub = document.createElement("div"); sub.className="sub"; 
-        sub.innerText=`${letra}${nivel}`;
-        const idSub = `r${r}_n${nivel}_l${letra}_i${i}`;
-        sub.dataset.rack=r; sub.dataset.nivel=nivel; sub.dataset.id=idSub; sub.dataset.estado="ninguno";
+      letras.forEach(letra=>{
+        const ubicacion = document.createElement("div"); ubicacion.className="ubicacion";
+        const numSub = (r<=4 && nivel===1) ? 6 : 3;
+        for(let i=1;i<=numSub;i++){
+          const sub = document.createElement("div"); sub.className="sub"; 
+          sub.innerText=`${letra}${nivel}`;
+          const idSub = `r${r}_n${nivel}_l${letra}_i${i}`;
+          sub.dataset.rack=r; sub.dataset.nivel=nivel; sub.dataset.id=idSub; sub.dataset.estado="ninguno";
 
-        sub.addEventListener("click", ()=>{
-          if(sub.classList.contains("seleccionada")){
-            sub.classList.remove("seleccionada"); sub.dataset.estado="ninguno";
-            estadoGlobal[idSub]="ninguno";
-          }else{
-            sub.classList.add("seleccionada"); sub.classList.remove("piso"); sub.dataset.estado="verde";
-            estadoGlobal[idSub]="verde";
-          }
-          actualizarTotales(r);
-          actualizarGranTotal();
-          guardarEstado();
-        });
+          // Aplicar estado si existe
+          if(estadoGlobal[idSub]==="verde") { sub.classList.add("seleccionada"); sub.dataset.estado="verde"; }
+          if(estadoGlobal[idSub]==="piso") { sub.classList.add("piso"); sub.dataset.estado="piso"; }
 
-        ubicacion.appendChild(sub);
-      }
-      fila.appendChild(ubicacion);
+          sub.addEventListener("click", ()=>{
+            if(sub.classList.contains("seleccionada")){
+              sub.classList.remove("seleccionada"); sub.dataset.estado="ninguno"; estadoGlobal[idSub]="ninguno";
+            }else{
+              sub.classList.add("seleccionada"); sub.classList.remove("piso"); sub.dataset.estado="verde"; estadoGlobal[idSub]="verde";
+            }
+            actualizarTotales(r);
+            actualizarGranTotal();
+            guardarEstado();
+          });
+
+          ubicacion.appendChild(sub);
+        }
+        fila.appendChild(ubicacion);
+      });
+
+      rack.appendChild(fila);
     });
 
-    rack.appendChild(fila);
-  });
+    const totales = document.createElement("div"); totales.className="totales"; totales.id=`totales-${r}`;
+    rack.appendChild(totales);
+    contenedor.appendChild(rack);
+    actualizarTotales(r);
+  }
 
-  const totales = document.createElement("div"); totales.className="totales"; totales.id=`totales-${r}`;
-  rack.appendChild(totales);
-  contenedor.appendChild(rack);
-  actualizarTotales(r);
+  actualizarGranTotal();
 }
 
 /* =======================
-  Funciones de selección
+  Funciones de selección y totales
 ======================= */
 function seleccionarRack(rackNum, seleccionar){
   const subs=document.querySelectorAll(`.sub[data-rack="${rackNum}"]`);
@@ -186,13 +182,10 @@ function togglePiso(rackNum, nivel){
 }
 
 function seleccionarTodos(seleccionar){
-  for(let r=1;r<=totalRacks;r++){ seleccionarRack(r, seleccionar); }
-  actualizarGranTotal();
+  for(let r=1;r<=totalRacks;r++) seleccionarRack(r, seleccionar);
+  actualizarGranTotal(); guardarEstado();
 }
 
-/* =======================
-  Totales
-======================= */
 function actualizarTotales(rackNum){
   const subs=document.querySelectorAll(`.sub[data-rack="${rackNum}"]`);
   let verde=0, naranja=0;
@@ -263,10 +256,10 @@ function descargarExcel(){
 }
 
 /* =======================
-  Cargar estado al inicio
+  Ejecutar creación de racks
 ======================= */
-cargarEstado();
-</script>
+crearRacks();
 
+</script>
 </body>
 </html>
